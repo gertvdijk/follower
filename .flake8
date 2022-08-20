@@ -1,0 +1,9 @@
+[flake8]
+# Black's default line length.
+max-line-length = 88
+extend-exclude =
+    *.egg-info/,
+    ./.mypy_cache,
+    ./build,
+    ./dist,
+    ./.direnv
