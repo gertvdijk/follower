@@ -1,0 +1,35 @@
+{
+    "files.exclude": {
+        "**/.mypy_cache/": true,
+        "**/__pycache__/": true,
+        ".direnv/": true,
+    },
+    "files.insertFinalNewline": true,
+    "python.linting.mypyEnabled": true,
+    "python.linting.enabled": true,
+    "python.linting.mypyArgs": [
+        "--no-pretty",
+        "--strict",
+    ],
+    "python.analysis.diagnosticMode": "workspace",
+    "python.analysis.indexing": true,
+    "python.analysis.typeCheckingMode": "strict",
+    "python.formatting.provider": "black",
+    "editor.rulers": [
+        // Black's default line length.
+        88,
+    ],
+    // https://github.com/microsoft/vscode-isort#import-sorting-on-save
+    "[python]": {
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": true,
+        }
+    },
+    "isort.args": [ // for the 'ms-python.isort' extension
+        "--profile",
+        "black",
+    ],
+    // Enable to run black+isort on every (manual) save, perhaps in user-level settings.
+    // "editor.formatOnSave": true,
+    "python.testing.pytestEnabled": true,
+}
