@@ -1,7 +1,10 @@
-from analyse import get_follower_data
-from check import check_tweeps
+from __future__ import annotations
+
 import os
-from sys import platform
+import sys
+
+from .analyse import get_follower_data
+from .check import check_tweeps
 
 
 def analyse_user():
@@ -17,9 +20,9 @@ def analyse_user():
 
     if reuse_data == "j" or reuse_data == "J":
         try:
-            if platform == "linux" or platform == "linux2" or platform == "darwin":
+            if sys.platform in ("linux", "linux2", "darwin"):
                 os.system("rm *.json")
-            elif platform == "win32":
+            elif sys.platform == "win32":
                 os.system("del *.json")
         except:
             print("No files to delete")
@@ -32,9 +35,9 @@ def analyse_user():
     followers = get_follower_data(wie)
     test = check_tweeps(wie, datum)
 
-    if platform == "linux" or platform == "linux2" or platform == "darwin":
+    if sys.platform in ("linux", "linux2", "darwin"):
         os.system("clear")
-    elif platform == "win32":
+    elif sys.platform == "win32":
         os.system("cls")
 
     print(followers)

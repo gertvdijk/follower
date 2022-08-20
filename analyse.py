@@ -1,14 +1,17 @@
-from tweepy import OAuthHandler
-from tweepy import API
-import tweepy
-from collections import Counter
-from datetime import datetime, date, time, timedelta
-import sys
+from __future__ import annotations
+
+import collections
+import datetime
+import io
 import json
 import os
-import io
 import re
+import sys
 import time
+
+import tweepy
+import tweepy.API
+import tweepy.OAuthHandler
 
 # Get the twitter credentials from a (hidden) file
 secrets = open(".login")
@@ -21,9 +24,9 @@ consumer_secret = login[1].rstrip("\n")
 access_token = login[2].rstrip("\n")
 access_token_secret = login[3].rstrip("\n")
 
-auth = OAuthHandler(consumer_key, consumer_secret)
+auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
 auth.set_access_token(access_token, access_token_secret)
-auth_api = API(auth, wait_on_rate_limit=True)
+auth_api = tweepy.API(auth, wait_on_rate_limit=True)
 
 # Helper functions to load and save intermediate steps
 def save_json(variable, filename):
@@ -71,7 +74,7 @@ def twitter_time_to_object(time_string):
         second_bit = match.group(2)
         last_bit = match.group(3)
         new_string = first_bit + " " + last_bit
-        date_object = datetime.strptime(new_string, twitter_format)
+        date_object = datetime.datetime.strptime(new_string, twitter_format)
         return date_object
 
 
@@ -90,7 +93,7 @@ def seconds_since_twitter_time(time_string):
 
 
 def get_utc_unix_time():
-    dts = datetime.utcnow()
+    dts = datetime.datetime.utcnow()
     return time.mktime(dts.timetuple())
 
 
@@ -192,7 +195,7 @@ def get_follower_data(target):
     res += "Follower age ranges\n"
     res += "===================\n"
     total = 0
-    following_counter = Counter()
+    following_counter = collections.Counter()
     for label, entries in sorted(ranges.items()):
         res += "" + str(len(entries)) + " accounts were created within " + label + "\n"
         total += len(entries)

@@ -1,6 +1,8 @@
-import sys
+from __future__ import annotations
+
+import datetime
 import json
-from datetime import datetime, timedelta
+
 import pytz
 
 utc = pytz.UTC
@@ -14,18 +16,18 @@ def check_tweeps(schermnaam, datum):
     twitteraars = 0
     aantal = 0
     # Twitter tijd is UTC dus even aanpassen
-    twitter_datum = datetime.strptime(datum, "%d-%m-%Y").strftime("%Y-%m-%d")
-    startDate = utc.localize(datetime.strptime(datum, "%d-%m-%Y"))
-    startDate = startDate - timedelta(hours=2)
+    startDate = utc.localize(datetime.datetime.strptime(datum, "%d-%m-%Y"))
+    startDate = startDate - datetime.timedelta(hours=2)
     with open(f"{schermnaam}_followers.json", "r") as f:
         page = json.load(f)
         for creep in page:
             # Wanneer is deze lid geworden van twitter
             aanmaak = creep["created_at"]
-            aanmaak = datetime.strftime(
-                datetime.strptime(aanmaak, "%a %b %d %H:%M:%S +0000 %Y"), "%Y-%m-%d"
+            aanmaak = datetime.datetime.strftime(
+                datetime.datetime.strptime(aanmaak, "%a %b %d %H:%M:%S +0000 %Y"),
+                "%Y-%m-%d",
             )
-            aanmaak = utc.localize(datetime.strptime(aanmaak, "%Y-%m-%d"))
+            aanmaak = utc.localize(datetime.datetime.strptime(aanmaak, "%Y-%m-%d"))
             # Hoeveel volgers? En zet om naar een string voor de nul-check
             volgers = str(creep["followers_count"])
             # Hoeveel tweets? En zet om naar een string voor de nul-check
