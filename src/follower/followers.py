@@ -45,4 +45,5 @@ def analyse_user():
     print(test)
 
 
-analyse_user()
+if __name__ == "__main__":
+    analyse_user()
