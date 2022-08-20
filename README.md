@@ -15,11 +15,11 @@ Install using:
 
 You will need twitter api auth. See: https://medium.com/analytics-vidhya/accessing-the-twitter-api-with-tweepy-8421329afc5c
 
-Create a file in the same dir where these python files reside,  name it .login and paste your credentials in below order
+Create a file in the same dir where these python files reside,  name it `.login` and paste your credentials in below order, one on a line of its own:
 * api key
 * api secret
-* acces token
-* acces secret
+* access token
+* access secret
 
 Execute:
 
@@ -27,6 +27,6 @@ Execute:
 
 and fill desired fields upon asking.
 
-The analyse.py module will fetch latest 5000 followers with help of the twitter api, and store this in a json file. It will also show the age of these followers accounts in 10 two weeks bins. Alternatively the script will use the stored data, this is optional.
+The `analyse` module will fetch latest 5000 followers with help of the twitter api, and store this in a json file. It will also show the age of these followers accounts in 10 two weeks bins. Alternatively the script will use the stored data, this is optional.
 
-The check.py module will do a quick scan on these accounts, it will check if the user is following users themselves, and if they ever tweeted or not.
+The `check` module will do a quick scan on these accounts, it will check if the user is following users themselves, and if they ever tweeted or not.
