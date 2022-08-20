@@ -3,11 +3,10 @@ from __future__ import annotations
 import os
 import sys
 
-from .analyse import get_follower_data
-from .check import check_tweeps
+from . import analyse, check
 
 
-def analyse_user():
+def analyse_user() -> None:
     print("Geef de twitter username (zonder @) in")
     print("en de datum vanaf wanneer je informatie wilt")
     print("over volgers. Let op de aangegeven datum notatie.")
@@ -15,7 +14,7 @@ def analyse_user():
     print('je kunt ook de data opnieuw gebruiken door "n" in te geven.\n\n')
 
     wie = input("Twitter username: ")
-    datum = input("Vanaf welke datum (dd-mm-jjj): ")
+    datum = input("Vanaf welke datum (dd-mm-jjjj): ")
     reuse_data = input("Data opnieuw ophalen (j|n): ")
 
     if reuse_data == "j" or reuse_data == "J":
@@ -32,8 +31,8 @@ def analyse_user():
         print("Graag j of n ingeven. Voer het script opnieuw uit.")
         sys.exit()
 
-    followers = get_follower_data(wie)
-    test = check_tweeps(wie, datum)
+    followers = analyse.get_follower_data(wie)
+    test = check.check_tweeps(schermnaam=wie, startdatum_str=datum)
 
     if sys.platform in ("linux", "linux2", "darwin"):
         os.system("clear")

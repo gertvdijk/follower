@@ -1,17 +1,19 @@
 from __future__ import annotations
 
 import collections
+import dataclasses
 import datetime
 import io
 import json
 import os
-import re
 import sys
-import time
+import typing
 
 import tweepy
 import tweepy.API
 import tweepy.OAuthHandler
+
+from .utils import twitter_isodateformat_str_to_datetime
 
 # Get the twitter credentials from a (hidden) file
 secrets = open(".login")
@@ -29,12 +31,14 @@ auth.set_access_token(access_token, access_token_secret)
 auth_api = tweepy.API(auth, wait_on_rate_limit=True)
 
 # Helper functions to load and save intermediate steps
-def save_json(variable, filename):
+def save_json(variable: typing.Any, filename: typing.AnyStr) -> None:
     with io.open(filename, "w", encoding="utf-8") as f:
         f.write(str(json.dumps(variable, indent=4, ensure_ascii=False)))
 
 
-def load_json(filename):
+def load_json(filename: str) -> typing.Any:
+    print(f"Loading {str(filename)}")
+
     ret = None
     if os.path.exists(filename):
         try:
@@ -45,77 +49,42 @@ def load_json(filename):
     return ret
 
 
-def try_load_or_process(filename, processor_fn, function_arg):
-    load_fn = None
-    save_fn = None
-    if filename.endswith("json"):
-        load_fn = load_json
-        save_fn = save_json
-    else:
-        load_fn = load_bin
-        save_fn = save_bin
+def try_load_or_process(filename: str, processor_fn, function_arg) -> typing.Any:
+    if not filename.endswith(".json"):
+        raise RuntimeError("Only .json files are supported to process.")
+
     if os.path.exists(filename):
-        print("Loading " + filename)
-        return load_fn(filename)
+        return load_json(filename)
     else:
         ret = processor_fn(function_arg)
-        print("Saving " + filename)
-        save_fn(ret, filename)
+        print(f"Saving {str(filename)}")
+        save_json(ret, filename)
         return ret
 
 
-# Some helper functions to convert between different time formats and perform date calculations
-def twitter_time_to_object(time_string):
-    twitter_format = "%a %b %d %H:%M:%S %Y"
-    match_expression = "^(.+)\s(\+[0-9][0-9][0-9][0-9])\s([0-9][0-9][0-9][0-9])$"
-    match = re.search(match_expression, time_string)
-    if match is not None:
-        first_bit = match.group(1)
-        second_bit = match.group(2)
-        last_bit = match.group(3)
-        new_string = first_bit + " " + last_bit
-        date_object = datetime.datetime.strptime(new_string, twitter_format)
-        return date_object
-
-
-def time_object_to_unix(time_object):
-    return int(time_object.strftime("%s"))
-
-
-def twitter_time_to_unix(time_string):
-    return time_object_to_unix(twitter_time_to_object(time_string))
-
-
-def seconds_since_twitter_time(time_string):
-    input_time_unix = int(twitter_time_to_unix(time_string))
-    current_time_unix = int(get_utc_unix_time())
-    return current_time_unix - input_time_unix
-
-
-def get_utc_unix_time():
-    dts = datetime.datetime.utcnow()
-    return time.mktime(dts.timetuple())
-
-
 # Get a list of follower ids for the target account
-def get_follower_ids(target):
-    ids = []
+def get_follower_ids(target: str) -> list[str]:
+    ids: list[str] = []
     for page in tweepy.Cursor(auth_api.get_follower_ids, screen_name=target).pages():
+        assert isinstance(page, list)
+        assert all((isinstance(item, str) for item in page))
         ids.extend(page)
 
     return ids
 
 
-# Twitter API allows us to batch query 100 accounts at a time
-# So we'll create batches of 100 follower ids and gather Twitter User objects for each batch
-def get_user_objects(follower_ids):
-    batch_len = 100
-    num_batches = len(follower_ids) / 100
-    # num_batches = 243000 / 100
+# Twitter API allows us to batch query 100 accounts at a time.
+# So we'll create batches of 100 follower ids and gather Twitter User objects for each
+# batch.
+def get_user_objects(
+    follower_ids: list[str], *, batch_size: int = 100
+) -> list[typing.Any]:
+    num_batches = len(follower_ids) / batch_size
     batches = (
-        follower_ids[i : i + batch_len] for i in range(0, len(follower_ids), batch_len)
+        follower_ids[i : i + batch_size]
+        for i in range(0, len(follower_ids), batch_size)
     )
-    all_data = []
+    all_data: list[typing.Any] = []
     for batch_count, batch in enumerate(batches):
         sys.stdout.write("\r")
         sys.stdout.flush()
@@ -123,71 +92,100 @@ def get_user_objects(follower_ids):
         sys.stdout.flush()
         sys.stdout.write("\n")
         sys.stdout.flush()
-        users_list = auth_api.lookup_users(user_id=batch)
-        users_json = map(lambda t: t._json, users_list)
+        users_list: typing.Any = auth_api.lookup_users(user_id=batch)
+        users_json: typing.Any = map(lambda t: t._json, users_list)
         all_data += users_json
     return all_data
 
 
-# Creates one week length ranges and finds items that fit into those range boundaries
-def make_ranges(user_data, num_ranges=10):
-    range_max = 604800 * num_ranges
-    range_step = range_max / num_ranges
+@dataclasses.dataclass(kw_only=True)
+class TwitterAccountDetails:
+    id: int
+    created_at: datetime.datetime
+    screen_name: str
+    name: str
+    friends_count: int
+    followers_count: int
+    favourites_count: int
+    statuses_count: int
 
-    # We create ranges and labels first and then iterate these when going through the whole list
-    # of user data, to speed things up
-    ranges = {}
-    labels = {}
-    for x in range(num_ranges):
-        start_range = x * range_step
-        end_range = x * range_step + range_step
-        label = "%02d" % x + " - " + "%02d" % (x + 1) + " weeks"
-        labels[label] = []
-        ranges[label] = {}
-        ranges[label]["start"] = start_range
-        ranges[label]["end"] = end_range
-    for user in user_data:
-        if "created_at" in user:
-            account_age = seconds_since_twitter_time(user["created_at"])
-            for label, timestamps in ranges.items():
-                if (
-                    account_age > timestamps["start"]
-                    and account_age < timestamps["end"]
-                ):
-                    entry = {}
-                    id_str = user["id_str"]
-                    entry[id_str] = {}
-                    fields = [
-                        "screen_name",
-                        "name",
-                        "created_at",
-                        "friends_count",
-                        "followers_count",
-                        "favourites_count",
-                        "statuses_count",
-                    ]
-                    for f in fields:
-                        if f in user:
-                            entry[id_str][f] = user[f]
-                    labels[label].append(entry)
-    return labels
+    @classmethod
+    def from_api_obj(
+        cls, api_obj: typing.Any, *, created_at: datetime.datetime | None = None
+    ) -> TwitterAccountDetails:
+        return TwitterAccountDetails(
+            id=api_obj["id_str"],
+            created_at=created_at
+            or twitter_isodateformat_str_to_datetime(api_obj["created_at"]),
+            screen_name=api_obj["screen_name"],
+            name=api_obj["name"],
+            friends_count=api_obj["friends_count"],
+            followers_count=api_obj["followers_count"],
+            favourites_count=api_obj["favourites_count"],
+            statuses_count=api_obj["statuses_count"],
+        )
 
 
-def get_follower_data(target):
-    print("Processing target: " + target)
+@dataclasses.dataclass(kw_only=True)
+class AccountAgeRange:
+    label: str
+    lower: datetime.datetime
+    upper: datetime.datetime
+    accounts: set[TwitterAccountDetails] = dataclasses.field(default_factory=set)
+
+    def in_range(self, account_created_at: datetime.datetime) -> bool:
+        return account_created_at >= self.lower and account_created_at < self.upper
+
+
+def make_ranges(
+    user_data: typing.Iterable[typing.Any], num_ranges: int = 10
+) -> list[AccountAgeRange]:
+    """
+    Creates one week length ranges and match accounts which are created within the
+    boundaries of each.
+    """
+    range_step = datetime.timedelta(days=7)
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    account_age_ranges = [
+        AccountAgeRange(
+            label=f"{i} - {i + 1} weeks",
+            lower=now - (range_step * (i + 1)),
+            upper=now - (range_step * i),
+        )
+        for i in range(num_ranges)
+    ]
+
+    for user_api_obj in user_data:
+        if "created_at" not in user_api_obj:
+            continue
+        created_at = twitter_isodateformat_str_to_datetime(user_api_obj["created_at"])
+        for account_age_range in account_age_ranges:
+            if account_age_range.in_range(created_at):
+                account_age_range.accounts.add(
+                    TwitterAccountDetails.from_api_obj(
+                        user_api_obj, created_at=created_at
+                    )
+                )
+                break
+    return account_age_ranges
+
+
+def get_follower_data(screen_name: str) -> str:
+    print(f"Processing target: {screen_name}")
 
     # Get a list of Twitter ids for followers of target account and save it
-    filename = target + "_follower_ids.json"
-    follower_ids = try_load_or_process(filename, get_follower_ids, target)
+    filename = f"{screen_name}_follower_ids.json"
+    follower_ids = try_load_or_process(filename, get_follower_ids, screen_name)
 
     # Fetch Twitter User objects from each Twitter id found and save the data
-    filename = target + "_followers.json"
+    filename = f"{screen_name}_followers.json"
     user_objects = try_load_or_process(filename, get_user_objects, follower_ids)
     total_objects = len(user_objects)
 
     # Record a few details about each account that falls between specified age ranges
     ranges = make_ranges(user_objects)
-    filename = target + "_ranges.json"
+    filename = f"{screen_name}_ranges.json"
     save_json(ranges, filename)
 
     # Print a few summaries
@@ -195,14 +193,10 @@ def get_follower_data(target):
     res += "Follower age ranges\n"
     res += "===================\n"
     total = 0
-    following_counter = collections.Counter()
-    for label, entries in sorted(ranges.items()):
-        res += "" + str(len(entries)) + " accounts were created within " + label + "\n"
+    for account_age_range in ranges:
+        label, entries = account_age_range.label, account_age_range.accounts
+        res += f"{len(entries)} accounts were created within {label}\n"
         total += len(entries)
-        for entry in entries:
-            for id_str, values in entry.items():
-                if "friends_count" in values:
-                    following_counter[values["friends_count"]] += 1
-    res += "Total: " + str(total) + "/" + str(total_objects) + "\n"
+    res += f"Total: {total}/{total_objects}\n"
 
     return res
